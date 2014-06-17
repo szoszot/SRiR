@@ -78,7 +78,7 @@ double life(int matrix_size, int ntimes, MPI_Comm comm)
         matrix[i][0].tstatus      = matrix[i][matrix_size+1].tstatus      = temp[i][0].tstatus      = temp[i][matrix_size+1].tstatus      = 0 ;
     }
     /* Initialize the life matrix */
-#pragma omp parallel for private(i, j) shared (matrix)
+#pragma omp parallel for private(i,j) shared (matrix)
     for (i = 1; i <= mysize; i++)  {
         srand((long)(1000^(i-1+mysize))) ;
         for (j = 1; j<= matrix_size; j++) {
@@ -99,11 +99,13 @@ double life(int matrix_size, int ntimes, MPI_Comm comm)
     }
 
     //wypisz
-    for (i = 1; i <= mysize; i++)  {
-        for (j = 1; j<= matrix_size; j++) {
-            cout<<matrix[i][j].numer<<"\t";
+    if(matrix_size < 11) {
+        for (i = 1; i <= mysize; i++)  {
+            for (j = 1; j<= matrix_size; j++) {
+                cout<<matrix[i][j].numer<<"\t";
+            }
+            cout<<endl;
         }
-        cout<<endl;
     }
     /*ROZROST STRUKRURY*/
     int rs;
@@ -121,7 +123,6 @@ double life(int matrix_size, int ntimes, MPI_Comm comm)
         MPI_Isend(&matrix[mysize][0],matrix_size+2,MPI_KOM,next,0,comm,req+2);
         MPI_Irecv(&matrix[mysize+1][0],matrix_size+2,MPI_KOM,next,0,comm,req+3);
         MPI_Waitall(4, req, status);
-		#pragma omp parallel for private(i, j) shared (matrix)
         for (i = 1; i <= mysize; i++)  {
             for (j = 1; j<= matrix_size; j++){
                 if(matrix[i][j].status == 0 ) {
@@ -182,7 +183,7 @@ double life(int matrix_size, int ntimes, MPI_Comm comm)
         }
 
         //update z rozrosrem
-		#pragma omp parallel for private(i, j) shared (matrix)
+
         for (i = 1; i <= mysize; i++)  {
             for (j = 1; j<= matrix_size; j++){
                 if( matrix[i][j].status == 0) {
@@ -197,9 +198,10 @@ double life(int matrix_size, int ntimes, MPI_Comm comm)
         }
         it++;
     }
+
     /*KONIEC ZAPETLANIA */
     /*USTAWIAMY GRANICE*/
-	#pragma omp parallel for private(i, j) shared (matrix)
+#pragma omp parallel for private (i,j) shared (matrix)
     for( int i = 1; i <= mysize; i++ ){
         for( int j = 1; j<= matrix_size; j++ ){
             //ustawianie, ktora komorka jest na granicy - spr numery sasiadow
@@ -222,18 +224,21 @@ double life(int matrix_size, int ntimes, MPI_Comm comm)
     cout<<"\nNa granicy: "<<naGranicy<<endl;
 
     cout<<"\nPo rozroscie: \n";
-    for (i = 1; i <= mysize; i++)  {
-        for (j = 1; j<= matrix_size; j++) {
-            cout<<matrix[i][j].numer<<"\t";
+    if(matrix_size < 11) {
+        for (i = 1; i <= mysize; i++)  {
+            for (j = 1; j<= matrix_size; j++) {
+                cout<<matrix[i][j].numer<<"\t";
+            }
+            cout<<endl;
         }
-        cout<<endl;
     }
 
-#pragma region Zakomentowane
+
     /* Play the game of life for given number of iterations */
     starttime = MPI_Wtime() ;
     int zliczacz = 0;
     for (k = 0; k < ntimes; k++) {
+
         MPI_Request      req[4];
         MPI_Status       status[4];
 
@@ -245,13 +250,13 @@ double life(int matrix_size, int ntimes, MPI_Comm comm)
         MPI_Waitall(4, req, status);
 
         /*REKRYSTALIZACJA */
-#pragma omp parallel
-        while(zliczacz < naGranicy/2){
+#pragma omp parallel shared (zliczacz,matrix)
+        for(zliczacz = 0; zliczacz < naGranicy/2;){
             int numer_koloru_tablica = 0;
-            int i = rand()%mysize;
+            int i = rand()%mysize+1;
             int j = rand()%matrix_size+1;
             int k0[8], k0T;
-            if(matrix[i][j].wylosowana == 0 && matrix[i][j].naGranicy == 1) {
+            if(matrix[i][j].wylosowana == 0 && matrix[i][j].naGranicy == 1 ) {
                 k0[0] = matrix[i-1][j-1]	.numer;
                 k0[1] = matrix[i][j-1]		.numer;
                 k0[2] = matrix[i+1][j-1]	.numer;
@@ -270,7 +275,7 @@ double life(int matrix_size, int ntimes, MPI_Comm comm)
                 bool flaga = false;
                 for ( int l = 0; l < 8; l++) {
                     for (int m = 0; m < 8; m++) {
-                        if(k0[l] == k0[m]) {
+                        if(k0[l] == k0[m] && k0[0] != 0) {
                             temp_licznik1++;
                         }
                         if(temp_licznik1 == 4 ) tyleSamo++;		//gdy 4 ma taki sam kolor
@@ -300,18 +305,26 @@ double life(int matrix_size, int ntimes, MPI_Comm comm)
                 }
             }
         }
-    }
+        zliczacz = 0;
 
-#pragma endregion
+        //cout<<"\nhellol!\n";
+        for (i = 0; i <= mysize; i++)  {
+            for (j = 0; j<= matrix_size; j++) {
+                matrix[i][j].wylosowana = 0;
+            }
+        }
+    }
 
     /* Return the average time taken/processor */
     //wypisz
     cout<<"\nPo monte carlo: \n";
-    for (i = 1; i <= mysize; i++)  {
-        for (j = 1; j<= matrix_size; j++) {
-            cout<<matrix[i][j].numer<<"\t";
+    if(matrix_size < 11) {
+        for (i = 1; i <= mysize; i++)  {
+            for (j = 1; j<= matrix_size; j++) {
+                cout<<matrix[i][j].numer<<"\t";
+            }
+            cout<<endl;
         }
-        cout<<endl;
     }
     slavetime = MPI_Wtime() - starttime;
     MPI_Reduce (&slavetime, &totaltime, 1, MPI_DOUBLE, MPI_SUM, 0, comm);
@@ -321,7 +334,7 @@ double life(int matrix_size, int ntimes, MPI_Comm comm)
 
 int main(int argc, char *argv[])
 {
-    int rank, N = 10, iters = 5000 ;
+    int rank, N = 8, iters = 100;
     double time ;
     MPI_Init (&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank) ;
@@ -369,7 +382,7 @@ int main(int argc, char *argv[])
 
     /* Print the total time taken */
     if (rank == 0)
-        printf("[%d] Czas wykonania: %f",rank,time);
+        printf("[%d] Czas wykonania: %f \n",rank,time);
 
     //MPE_Close_graphics(&graph);
     MPI_Finalize();
